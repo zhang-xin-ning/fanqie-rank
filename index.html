@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>番茄小说原创新书榜分析系统</title>
-<script src="assets/echarts.min.js" defer></script>
+<script src="assets/echarts.min.js" defer onload="window.__echartsReady&&window.__echartsReady()" onerror="window.__echartsFail&&window.__echartsFail()"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;background:#16181f;color:#e2e4ea;min-height:100vh;}
@@ -296,7 +296,7 @@ td.bookname{color:#fff;font-weight:600;white-space:normal;min-width:150px;}
   </div>
 </div>
 
-<script>window.__DATA_VER__='202609162218';</script>
+<script>window.__DATA_VER__='202609162228';</script>
 <script>
 /* 全局错误收集：任何一步出错都在页面底部显示，不静默白屏 */
 window.__errs=[];
@@ -353,17 +353,21 @@ function flushCharts(){
   const q=chartQueue.splice(0,chartQueue.length);
   q.forEach(function(item){makeChart(item.id,item.opt);});
 }
-/* 轮询等待异步ECharts就绪后统一画图；约20秒仍未就绪则提示 */
+/* ECharts 异步加载完成后统一补绘：onload事件驱动 + 轮询兜底，慢网络也不漏图 */
+window.__echartsReady=function(){
+  try{flushCharts();if(typeof resizeAll==='function')setTimeout(resizeAll,120);}
+  catch(e){window.__reportErr('图表初始化',e);}
+};
+window.__echartsFail=function(){
+  chartQueue.forEach(function(item){var el=document.getElementById(item.id);
+    if(el)el.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100%;min-height:120px;color:#c98;font-size:12px;text-align:center;padding:8px;">图表库加载失败，请检查网络后刷新</div>';});
+  chartQueue.length=0;
+};
 (function(){
   var tries=0;
   var timer=setInterval(function(){
-    if(typeof echarts!=='undefined'){clearInterval(timer);flushCharts();if(typeof resizeAll==='function')setTimeout(resizeAll,120);}
-    else if(++tries>330){
-      clearInterval(timer);
-      chartQueue.forEach(function(item){var el=document.getElementById(item.id);
-        if(el)el.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100%;min-height:120px;color:#c98;font-size:12px;text-align:center;padding:8px;">图表库加载失败，请检查网络后刷新</div>';});
-      chartQueue.length=0;
-    }
+    if(typeof echarts!=='undefined'){clearInterval(timer);window.__echartsReady();}
+    else if(++tries>500){clearInterval(timer);}  /* 30秒后停止空转，后续交给onload/数据就绪补绘，不清队列 */
   },60);
 })();
 const axisStyle={axisLabel:{color:'#8b8fa3',fontSize:11},axisLine:{lineStyle:{color:'#3a3d48'}},splitLine:{lineStyle:{color:'#262a35'}}};
